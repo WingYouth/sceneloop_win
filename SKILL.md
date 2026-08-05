@@ -104,7 +104,9 @@ new project before planning:
   instruction to derive it from the script;
 - dialogue and narration language: `source` to preserve the script language,
   or a language code such as `zh`, `en`, `ja`, or `ko`;
-- video resolution selected from the locked video model's configured choices.
+- video resolution selected from the locked video model's configured choices;
+- execution mode: the recommended asset-review checkpoint, or an explicitly
+  confirmed direct full-episode run.
 
 First confirm the source script, English `project_id`, and episode number.
 Then complete the ordered project-setting questions below. Do not start
@@ -131,7 +133,21 @@ Collect project settings in this exact conversational order:
    follows the model provider. Identify the configured default as the
    recommended starting point, but do not select it without the user's answer.
 9. Wait for the user's resolution answer.
-10. Do not invoke the `plan` stage until aspect ratio, visual style, dialogue
+10. For a new episode request that is not limited to one explicit business
+    artifact, ask the user to choose between the recommended review-first mode
+    and direct full-episode generation. Explain that review-first mode generates
+    the character and location reference images, presents them for approval,
+    and pauses before any first-frame or video generation.
+11. If the user requests direct full-episode generation, give this concise
+    warning in Chinese, or a faithful translation without added detail when the
+    conversation uses another language:
+
+    > ⚠️ 直接生成完整一集费用较高，且中间效果未经确认，可能出现不满意和返工。建议先确认人物与场景设定图。是否仍要直接生成？
+12. Wait for a separate, explicit confirmation after the warning. The user's
+    original request to create a complete episode is not confirmation to skip
+    review. Silence, an ambiguous reply, or confirmation given before the
+    warning does not authorize direct full-episode generation.
+13. Do not invoke the `plan` stage until aspect ratio, visual style, dialogue
    language, and video resolution are all confirmed.
    If the user wants SceneLoop to decide the style, pass an explicit
    instruction to derive one coherent visual style from the script.
@@ -241,7 +257,8 @@ sceneloop models video --model <video_model>
 The CLI option is spelled `--video-resolution`. Use only a value returned for
 the selected model. Never write `--video-resoluction`.
 
-Run a complete episode:
+Run a complete episode only after the direct full-episode risk warning and the
+user's separate explicit confirmation:
 
 ```bash
 sceneloop run <script_path> \
@@ -252,7 +269,8 @@ sceneloop run <script_path> \
   --style-requirements <visual_direction> \
   --dialogue-language <source|language_code> \
   --video-resolution <model_supported_resolution> \
-  --production-mode <standard|live_action>
+  --production-mode <standard|live_action> \
+  --stages ingest adapt plan characters locations render
 ```
 
 Script adaptation is already included in a normal run. To bypass it only after
@@ -286,6 +304,11 @@ sceneloop run <script_path> \
   --production-mode <standard|live_action> \
   --stages ingest adapt plan characters locations
 ```
+
+Use that exact stage list for the default review-first pass. When it finishes,
+send the actual generated character and location reference images to the user,
+not only file paths or a text summary, and stop. Do not invoke `render`,
+`render-shot`, or `render-episode` in the same turn.
 
 ### Single-Step Generation
 
@@ -385,11 +408,30 @@ secure prompt supplied by setup or `sceneloop license activate`.
 
 Run the smallest supported scope:
 
-- complete drama or episode: `sceneloop run`;
+- review-first episode preparation: `sceneloop run --stages ingest adapt plan characters locations`;
+- explicitly confirmed direct full episode: `sceneloop run --stages ingest adapt plan characters locations render`;
 - one business stage: `sceneloop run --stages <stage>`;
 - one shot up to a requested boundary: `sceneloop render-shot --until ...`;
 - ordered shots: `sceneloop render-episode`;
 - dependency inspection without model calls: `--dry-run`.
+
+For a normal new episode, always use the review-first path. After character and
+location generation completes, inspect the real canonical assets, send every
+current character and location reference image to the user, and pause. Resume
+video generation only after the user explicitly approves those presented
+assets. If the user rejects an image or requests a revision, regenerate only
+the requested asset scope, present the updated images again, and continue to
+wait; approval of older images does not approve replacements.
+
+After asset approval, use `render-episode` for the requested episode or shot
+range. The approval applies only to the presented project and episode assets;
+do not reuse it for a different episode or materially changed assets.
+
+The only way to bypass the asset-review checkpoint is the direct full-episode
+path described in User Inputs: give the concise warning specified there, then
+receive a separate explicit confirmation. Never call `sceneloop run` without an explicit
+`--stages` list for an episode request, because its CLI default includes
+`render` and would bypass the approval checkpoint.
 
 Before later stages, inspect real canonical files and assets. Resume the
 smallest missing stage or shot. Do not call internal generation modules or
