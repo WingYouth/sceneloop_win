@@ -1,19 +1,49 @@
 ---
 name: sceneloop
-description: Produce or continue an AI drama from a TXT, Markdown, or DOCX script with the packaged SceneLoop runtime. Use whenever the user requests a faithful visual script adaptation, storyboard JSON, character or location references, shot first frames, shot videos, an episode, or a complete AI drama. After secure setup, collect project-wide aspect ratio, visual direction, dialogue language, and model-supported video resolution, run only the SceneLoop CLI, preserve configured models and completed assets, and resume the smallest missing scope.
+description: Produce or continue an AI drama, animate one uploaded image, or create a 15-second AI product ad with the packaged SceneLoop and AIAds runtimes. Use for script adaptation, storyboards, references, shot videos, episodes, image motion, or ads from product briefs, images, documents, and URLs. After secure setup, run only the matching local CLI, enforce its review gates, preserve successful assets and locked models, and resume the smallest missing scope.
 ---
 
 # SceneLoop
 
-SceneLoop turns a script into an ordered episode of per-shot videos. Hermes,
-OpenClaw, Feishu, and other host Agents coordinate the user conversation, but
-the packaged SceneLoop runtime performs every production stage.
+SceneLoop turns a script into an ordered episode of per-shot videos or animates
+one user-supplied image directly. Hermes, OpenClaw, Feishu, and other host
+Agents coordinate the user conversation, but the packaged SceneLoop runtime
+performs every production stage.
+
+## AI Ads Mode
+
+For product-ad requests, use only `python -m ai_ads.cli`; never generate or
+repair Ads JSON, images, or videos with the host Agent.
+
+Before `start`, confirm the English `project_id`, product brief or supplied
+sources, market, language, aspect ratio, format (`ugc` or `product_visual`),
+and CTA. Then run the smallest resumable scope:
+
+```text
+start -> add sources -> intake -> draft/review/confirm-input
+      -> product-analysis -> audience -> creative-strategy
+      -> creative-concepts -> select-concept -> script -> storyboard
+      -> plan/generate-assets -> plan/generate-video
+```
+
+Do not cross these checkpoints without explicit user approval:
+
+1. `confirm-input`;
+2. `approve-product-profile` when the project is waiting for review;
+3. `select-concept`;
+4. generated-asset review before video work, and video-plan review before paid
+   generation.
+
+Use `status` to inspect real artifacts and `resume` or a targeted command to
+continue only missing work. Keep selected models and completed assets; obtain
+approval before changing a model or regenerating an asset. Never expose
+credentials or provider payloads.
 
 ## Non-Negotiable Rules
 
 1. Use SceneLoop for script adaptation, storyboard planning, character images,
-   location images, first frames, videos, episode rendering, and continuation
-   of existing work.
+   location images, first frames, videos, direct uploaded-image animation,
+   episode rendering, and continuation of existing work.
 2. Never replace a SceneLoop text, image, video, or multimodal model call with
    the host Agent's own model capabilities.
 3. Never fabricate or manually repair canonical JSON, generated images, model
@@ -65,13 +95,21 @@ Credential readiness is a blocking gate and must run before collecting
    provider configuration is incomplete, tell the user that local SceneLoop
    authorization and model-provider setup must be completed before production.
 4. Execute the resolved `sceneloop-setup` automatically in a user-visible,
-   interactive local session. Do not ask the user to locate or launch it.
+   interactive local session. Run the executable directly in the foreground;
+   do not wrap it with shell-specific keep-open commands such as `read -p`.
+   Do not ask the user to locate or launch it.
 5. Tell the user to enter the License Key and the API Keys requested for the
    selected text, image, and video providers only inside the local setup
    prompt. Never ask the user to paste a secret into chat, Feishu, Hermes,
    OpenClaw, command arguments, or Agent Memory.
+   If the user has already requested `minimax-h3-lightx2v-v5`, tell them to
+   select that exact video-model alias in setup and enter the requested
+   `minimax_h3_v5` only in the local setup prompt.
 6. Wait for setup to finish. It selects the three default model aliases, saves
-   the required provider credentials locally, and tests those credentials.
+   the required provider credentials locally, and runs each configured
+   provider's non-generating connection test when one is available. MiniMax H3
+   v5 setup stores the token but does not submit a paid generation task as a
+   credential test.
 7. After setup, resolve the runtime again and run
    `sceneloop license status`.
 8. Continue to project questions only when the License is valid and setup has
@@ -91,7 +129,72 @@ credential locally. Do not ask for the key in chat.
 If neither the runtime nor bundled setup can be resolved, report that the
 SceneLoop Skill package is incomplete. Never substitute host-Agent generation.
 
-## User Inputs
+## Workflow Selection
+
+After setup succeeds, run `sceneloop workflows` and identify the requested
+workflow before asking for project inputs. If the user's intent already
+selects one workflow, use it without asking them to reconfirm. If the request
+is ambiguous, present the returned SceneLoop workflows and wait for one
+selection. The current workflows are:
+
+1. **Script to episode** — upload a TXT, Markdown, or DOCX script; SceneLoop
+   plans the storyboard and generates character, location, keyframe, and video
+   assets.
+2. **Continue an existing project** — diagnose or render selected shots from
+   an existing SceneLoop storyboard.
+3. **Animate one image** — use one uploaded image plus the user's motion text
+   to generate one video directly, without script adaptation, storyboard,
+   character generation, location generation, or keyframe generation.
+
+An image accompanied by wording such as “让这张图动起来”, “生成动效视频”,
+“animate this image”, or an equivalent explicit request selects **Animate one
+image**. Do not route that request through the episode workflow merely because
+the image contains people, products, or a recognizable environment.
+
+### Animate One Image Inputs
+
+For **Animate one image**, collect only:
+
+- the uploaded local JPEG, PNG, or WebP image;
+- the user's desired motion, action, local effect, and camera movement; do not
+  ask them to redescribe subjects, composition, or visual style already visible
+  in the uploaded image;
+- one configured video model whose `supports_image_animation` value is `true`;
+- one exact resolution returned for that model;
+- duration in whole seconds, using the model default only when the user accepts
+  it or did not request a different duration;
+- aspect ratio only when it cannot be safely inferred from image orientation
+  or the selected model requires a choice between supported orientations;
+- optional integer seed and optional extra MP4 export path.
+
+SceneLoop automatically creates a lightweight project ID when `--project-id`
+is omitted. Do not ask the user for an English project ID. Pass
+`--project-id` only when the user explicitly supplies a preferred project
+name. The project permanently archives the uploaded source image, generated
+video, and generation settings together so the upload-cache path is not the
+only copy of the source.
+
+Run `sceneloop models video` and consider only entries with
+`supports_image_animation: true`. `minimax-h3-lightx2v-v5` is a supported
+choice for this workflow: it uses `minimax_h3_v5`, accepts `9:16` or `16:9`,
+supports 1–10 whole seconds, and accepts the uploaded image as its sole
+reference. Match portrait images to a `竖` resolution and landscape images to
+a `横` resolution. For a square image with this model, ask whether the user
+wants `9:16` or `16:9`; never choose a crop orientation silently.
+
+Do not ask for a script, English project ID, episode number, characters,
+locations, visual style, dialogue language, production mode, or asset-review
+approval for this workflow. Do not run `run`, `render-shot`, or
+`render-episode`. Pass the user's image and motion text unchanged in meaning to
+the direct command; do not invent motion or style changes that the user did not
+request, create a surrogate storyboard, or manually author canonical JSON.
+SceneLoop automatically expands the motion text into the provider prompt with
+an image-reference contract: the upload is the authoritative opening frame,
+its subjects, setting, composition, colors, lighting, materials, and visual
+style remain consistent, and only explicitly requested motion or transformation
+may change them. Do not duplicate that boilerplate in `--prompt`.
+
+## Episode User Inputs
 
 Only after the credential readiness gate succeeds, collect these values for a
 new project before planning:
@@ -104,6 +207,7 @@ new project before planning:
   instruction to derive it from the script;
 - dialogue and narration language: `source` to preserve the script language,
   or a language code such as `zh`, `en`, `ja`, or `ko`;
+- video model selected from the configured SceneLoop video-model aliases;
 - video resolution selected from the locked video model's configured choices;
 - execution mode: the recommended asset-review checkpoint, or an explicitly
   confirmed direct full-episode run.
@@ -125,30 +229,40 @@ Collect project settings in this exact conversational order:
    `ko`, or another valid language code requests that spoken content in the
    selected language. Do not infer this choice from the script.
 6. Wait for the user's language answer.
-7. Resolve the configured video-model alias, then run
-   `sceneloop models video --model <video_model>` and read that model's
-   `supported_resolutions`.
-8. Ask the user to choose one of those exact values. State clearly that higher
+7. Run `sceneloop models video` and ask the user to choose one of the returned
+   video-model aliases. When `minimax-h3-lightx2v-v5` is returned, present it
+   as an available MiniMax H3 v5 multi-reference video model. Offer it only
+   for `9:16` or `16:9` projects; it does not support `1:1`. Never claim that
+   it uses the MiniMax API credential: it requires the locally configured
+   `minimax_h3_v5`.
+8. Wait for the user's video-model answer. Do not silently use the packaged
+   default when the user is choosing production settings.
+9. Lock the selected alias, then run
+   `sceneloop models video --model <video_model>` and read that model's exact
+   `supported_resolutions`. For `minimax-h3-lightx2v-v5`, valid values are
+   `480p竖`, `480p横`, `768p竖`, `768p横`, `1080p竖`, and `1080p横`; the
+   selected orientation must match the project aspect ratio.
+10. Ask the user to choose one of those exact values. State clearly that higher
    resolution generally costs more and takes longer, while actual billing
    follows the model provider. Identify the configured default as the
    recommended starting point, but do not select it without the user's answer.
-9. Wait for the user's resolution answer.
-10. For a new episode request that is not limited to one explicit business
+11. Wait for the user's resolution answer.
+12. For a new episode request that is not limited to one explicit business
     artifact, ask the user to choose between the recommended review-first mode
     and direct full-episode generation. Explain that review-first mode generates
     the character and location reference images, presents them for approval,
     and pauses before any first-frame or video generation.
-11. If the user requests direct full-episode generation, give this concise
+13. If the user requests direct full-episode generation, give this concise
     warning in Chinese, or a faithful translation without added detail when the
     conversation uses another language:
 
     > ⚠️ 直接生成完整一集费用较高，且中间效果未经确认，可能出现不满意和返工。建议先确认人物与场景设定图。是否仍要直接生成？
-12. Wait for a separate, explicit confirmation after the warning. The user's
+14. Wait for a separate, explicit confirmation after the warning. The user's
     original request to create a complete episode is not confirmation to skip
     review. Silence, an ambiguous reply, or confirmation given before the
     warning does not authorize direct full-episode generation.
-13. Do not invoke the `plan` stage until aspect ratio, visual style, dialogue
-   language, and video resolution are all confirmed.
+15. Do not invoke the `plan` stage until aspect ratio, visual style, dialogue
+   language, video model, and video resolution are all confirmed.
    If the user wants SceneLoop to decide the style, pass an explicit
    instruction to derive one coherent visual style from the script.
 
@@ -183,6 +297,13 @@ planning or rendering video.
 Resolve one configured text-model alias, image-model alias, and video-model
 alias for the episode. Use explicit run overrides when the user supplies them;
 otherwise use the packaged defaults.
+
+When the user selects `minimax-h3-lightx2v-v5`, lock that exact alias and pass
+it through `--video-model` for planning and every render command. This model
+uses SceneLoop's `multimodal_reference` path with an opening frame plus ordered
+identity and environment references, accepts at most five reference images,
+and supports whole-second shot durations from 1 through 10 seconds. Do not
+route it through the official MiniMax video API or substitute another model.
 
 Keep those aliases fixed across stages, shots, retries, and resumed runs. Never
 automatically switch model IDs, providers, resolution, or strategy after an
@@ -227,6 +348,16 @@ reference image paths into every shot.
 
 Use each shot's dynamic `durationMs` for video generation.
 
+The direct image-animation workflow is separate:
+
+```text
+uploaded image + motion text -> lightweight project -> archived image + one video
+```
+
+It performs no text-model or image-model generation and never enters
+`ingest`, `adapt`, `plan`, `characters`, `locations`, `keyframe`, or episode
+`render` stages.
+
 Script adaptation runs by default before storyboard planning. Never let the
 host Agent rewrite the script itself. Skip adaptation only when the user
 explicitly requests planning directly from the normalized source. When
@@ -257,6 +388,28 @@ sceneloop models video --model <video_model>
 The CLI option is spelled `--video-resolution`. Use only a value returned for
 the selected model. Never write `--video-resoluction`.
 
+Animate one uploaded image directly:
+
+```bash
+sceneloop animate-image <uploaded_image_path> \
+  --prompt <user_motion_text> \
+  --workspace-dir <workspace_dir> \
+  --video-model <image_animation_model> \
+  --video-resolution <model_supported_resolution> \
+  --duration <whole_seconds>
+```
+
+Usually omit `--aspect-ratio` so SceneLoop infers portrait, landscape, or
+square from the image. Pass `--aspect-ratio <16:9|9:16|1:1>` only after an
+explicit user choice or when a square image must use a non-square model. Add
+`--seed <integer>` only when supplied by the user. Add `--overwrite` only when
+the user explicitly requests regeneration of the same deterministic request.
+The command automatically creates a stable lightweight project ID. A repeated
+identical request reuses that project and its video; a different image,
+prompt, model, resolution, duration, or seed creates a different automatic
+project. `--output-path` creates an extra MP4 export but never replaces the
+canonical video stored inside the project.
+
 Run a complete episode only after the direct full-episode risk warning and the
 user's separate explicit confirmation:
 
@@ -268,6 +421,7 @@ sceneloop run <script_path> \
   --aspect-ratio <16:9|9:16|1:1> \
   --style-requirements <visual_direction> \
   --dialogue-language <source|language_code> \
+  --video-model <video_model> \
   --video-resolution <model_supported_resolution> \
   --production-mode <standard|live_action> \
   --stages ingest adapt plan characters locations render
@@ -300,6 +454,7 @@ sceneloop run <script_path> \
   --aspect-ratio <16:9|9:16|1:1> \
   --style-requirements <visual_direction> \
   --dialogue-language <source|language_code> \
+  --video-model <video_model> \
   --video-resolution <model_supported_resolution> \
   --production-mode <standard|live_action> \
   --stages ingest adapt plan characters locations
@@ -322,6 +477,7 @@ sceneloop run <script_path> \
   --aspect-ratio <16:9|9:16|1:1> \
   --style-requirements <visual_direction> \
   --dialogue-language <source|language_code> \
+  --video-model <video_model> \
   --video-resolution <model_supported_resolution> \
   --production-mode <standard|live_action> \
   --stages <ingest|adapt|plan|characters|locations>
@@ -356,6 +512,7 @@ sceneloop render-shot \
   --project-id <english_project_id> \
   --episode <episode_number> \
   --shot <shot_number> \
+  --video-model <video_model> \
   --video-resolution <model_supported_resolution> \
   --dry-run
 
@@ -364,6 +521,7 @@ sceneloop render-shot \
   --project-id <english_project_id> \
   --episode <episode_number> \
   --shot <shot_number> \
+  --video-model <video_model> \
   --video-resolution <model_supported_resolution> \
   --until <assets|keyframe|video>
 ```
@@ -391,6 +549,7 @@ sceneloop render-episode \
   --episode <episode_number> \
   --start-shot <first_shot> \
   --end-shot <last_shot> \
+  --video-model <video_model> \
   --video-resolution <model_supported_resolution>
 ```
 
@@ -408,6 +567,7 @@ secure prompt supplied by setup or `sceneloop license activate`.
 
 Run the smallest supported scope:
 
+- one uploaded-image animation: `sceneloop animate-image` only;
 - review-first episode preparation: `sceneloop run --stages ingest adapt plan characters locations`;
 - explicitly confirmed direct full episode: `sceneloop run --stages ingest adapt plan characters locations render`;
 - one business stage: `sceneloop run --stages <stage>`;
@@ -462,13 +622,33 @@ Final videos are the only files under:
 <workspace_dir>/output/<project_id>/episodes/episode_NNN/shot_NNN.mp4
 ```
 
+Direct image animations create lightweight projects separately from episode
+assets:
+
+```text
+<workspace_dir>/image_animation_projects/<project_id>/
+  source/original.<jpg|jpeg|png|webp>
+  output/animated_<request_hash>.mp4
+  project.json
+```
+
+`project.json` records the archived source, motion prompt, locked model,
+expanded model prompt and prompt-policy version, resolution, aspect ratio,
+duration, seed, request hash, generation status, and canonical output path.
+Treat the archived source path as authoritative after project creation; the
+original host upload path may be temporary. Do not move these files into the
+episode project layout.
+
 Apply this layout only to new runs. Never migrate an existing legacy project
 unless the user explicitly requests it.
 
 ## Completion and Failure
 
-Declare success only when requested files exist and canonical JSON write-back
-is correct. On failure, report the stage, shot number, concise provider or
+Declare success only when requested files exist and any applicable canonical
+JSON write-back is correct. For direct image animation, verify the returned
+`projectPath`, archived `inputImage`, `projectManifestPath`, and
+`outputVideoPath` exist, then send that actual video to the user. On failure,
+report the workflow, applicable stage or shot number, concise provider or
 validation error, and the next executable SceneLoop action.
 
 License handling:

@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | [English](README_EN.md)
 
-SceneLoop is an intelligent workflow for producing AI comics and AI short dramas. Give a script and creative requirements to an AI agent such as Hermes or OpenClaw, and SceneLoop handles visual adaptation, storyboard planning, character and location assets, first frames, and shot-by-shot video generation.
+SceneLoop is an intelligent workflow for producing AI comics, AI short dramas, and single-image animation. Give a script and creative requirements to an AI agent such as Hermes or OpenClaw, and SceneLoop handles visual adaptation, storyboard planning, character and location assets, first frames, and shot-by-shot video generation. You can also upload one image with a motion description to generate an animated video directly, without the script, character, or location workflow.
 
 SceneLoop is developed by **Xi'an Wenyao Network Information Technology Co., Ltd.**
 
@@ -19,6 +19,9 @@ SceneLoop is developed by **Xi'an Wenyao Network Information Technology Co., Ltd
 - Supports animation, 3D, live-action, and other visual directions.
 - Maintains character, location, and visual continuity between adjacent shots.
 - Supports shot-level generation, resumable runs, and retries for failed shots.
+- Supports **Animate one image**: one uploaded image and a motion or camera description produce a video directly.
+- Supports the MiniMax H3 v5 multi-reference video model for `9:16` and `16:9` image animations and drama shots.
+- Automatically preserves the uploaded image's subjects, composition, colors, lighting, materials, and original visual style while applying only the motion, local effects, or camera movement explicitly requested by the user.
 
 ## Workflow
 
@@ -37,6 +40,18 @@ Upload script
 ```
 
 Hermes or OpenClaw handles the user conversation, collects parameters, and invokes SceneLoop. SceneLoop's configured models perform the actual text, image, and video production; the agent must not substitute its own models for these production steps.
+
+Image animation uses a separate lightweight workflow:
+
+```text
+Uploaded image + motion description
+  -> Create a lightweight project and permanently archive the source image
+  -> Use the image as the opening frame and visual-style reference
+  -> Generate one animated video directly
+  -> Save the source image, video, and generation settings
+```
+
+This workflow does not create a script, storyboard, characters, locations, or a separate shot first-frame project.
 
 ## Windows Requirements
 
@@ -109,6 +124,19 @@ After installation, start a new Hermes conversation or run:
 /reset
 ```
 
+### Update an Existing Hermes Installation
+
+If SceneLoop is already installed, run in PowerShell:
+
+```powershell
+$HermesHome = if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA "hermes" }
+$SceneLoopSkill = Join-Path $HermesHome "skills\sceneloop"
+Set-Location $SceneLoopSkill
+git pull --ff-only origin main
+```
+
+After updating, start a new Hermes conversation or run `/reset` in the current conversation.
+
 ### Install in OpenClaw
 
 OpenClaw can install this extracted Skill directly from GitHub:
@@ -145,6 +173,8 @@ Setup performs these steps:
 7. Lets you select a video model and enter its API key.
 8. Verifies and saves the configuration locally.
 
+To use MiniMax H3 v5, select `minimax-h3-lightx2v-v5` from the video-model list and enter its `minimax_h3_v5` only in the local Setup prompt. Setup saves and checks the configuration but does not submit a paid video-generation task just to test this credential.
+
 Enter License Keys and API keys only in the local Setup window or terminal. Never send them through Hermes, OpenClaw, Feishu, group chats, or screenshots.
 
 ### Check License Status
@@ -156,6 +186,8 @@ $SceneLoop = Join-Path $HermesHome "skills\sceneloop\scripts\sceneloop.exe"
 ```
 
 Device binding data remains in local Memurai. When a runtime lease expires, SceneLoop renews it online using the existing binding, so you normally do not need to enter the License Key again.
+
+You normally run `sceneloop-setup.exe` only once when installing SceneLoop on a new computer. Daily generation does not require Setup again. Rerun it only after moving to another computer, losing the License or Memurai data, losing the `.env` configuration, or when changing models or API keys.
 
 ## First Generation
 
@@ -171,10 +203,34 @@ Before production, the agent confirms:
 2. An aspect ratio such as `16:9` or `9:16`.
 3. A visual style; if you only request a short drama, it asks whether you want live action.
 4. The dialogue and narration language.
-5. Video resolution; higher resolutions generally increase model cost.
-6. Target finished-video duration when you explicitly request one.
+5. A video model and one of that model's supported resolutions; higher resolutions generally increase model cost.
+6. Whether to use the recommended character-and-location review flow or, after a risk warning, generate the full episode directly.
+7. Target finished-video duration when you explicitly request one.
 
-After confirmation, SceneLoop runs the workflow required by the current project. It fills missing assets and does not recreate completed assets without a reason.
+The recommended default generates character and location references first and presents them for approval before first-frame and video generation. SceneLoop fills missing assets and does not recreate completed assets without a reason.
+
+## Animate One Image
+
+Upload one JPEG, PNG, or WebP image in Hermes or OpenClaw and describe the desired subject motion, local effect, or camera movement. For example:
+
+```text
+Use SceneLoop's image-animation workflow. Make the person blink gently and smile, let the hair move slightly in the wind, and slowly push the camera forward. Generate a five-second video.
+```
+
+The agent selects **Animate one image** directly and does not ask for a script, project ID, episode number, characters, locations, or visual style. SceneLoop automatically:
+
+1. Infers portrait or landscape orientation from the image; for a square image, it asks the user to choose when the model does not support `1:1`.
+2. Uses the uploaded image as the authoritative visual reference and exact opening frame.
+3. Preserves subject identity and appearance, object design, environment, composition, colors, lighting, materials, and the overall visual style.
+4. Applies only the requested motion, local effects, and camera movement while avoiding unrelated additions, deformation, flicker, identity drift, and unintended restyling.
+5. Creates a lightweight project that permanently stores the source image, expanded model prompt, generation settings, and final video.
+
+For `minimax-h3-lightx2v-v5`, the available resolutions are:
+
+- Portrait: `480p竖`, `768p竖`, and `1080p竖`
+- Landscape: `480p横`, `768p横`, and `1080p横`
+
+It supports whole-second durations from 1 through 10 seconds. Queueing and generation may wait for up to 30 minutes in total, with status polled once per second.
 
 ## Example Requests
 
@@ -202,6 +258,12 @@ Continue shot 6 of episode 1 in night_case. Check existing assets and render thr
 Use SceneLoop to retry the failed shots in episode 1 of city_story without overwriting successful videos.
 ```
 
+### Animate an Uploaded Image
+
+```text
+Use SceneLoop to animate this image: make the person blink naturally, add a light breeze to the clothes and hair, and slowly push the camera forward while preserving the original visual style.
+```
+
 ## Output Files
 
 SceneLoop stores project references separately from video output:
@@ -222,6 +284,17 @@ output/<project_id>/
 ```
 
 `references/` contains scripts, JSON, images, and reports. `output/` contains videos only.
+
+Image animations use a separate lightweight project directory:
+
+```text
+image_animation_projects/<project_id>/
+  source/original.<jpg|jpeg|png|webp>  archived uploaded image
+  output/animated_<request_hash>.mp4   generated animation video
+  project.json                         original motion text, expanded model prompt, and generation state
+```
+
+Repeated requests with the same image, prompt, model, resolution, duration, and seed reuse the existing video. A change to any generation setting or prompt-policy version creates a new request result.
 
 ## Troubleshooting
 
@@ -303,6 +376,8 @@ This should not happen under normal conditions. Check that:
 ### Image or Video Generation Times Out
 
 Timeouts may occur when a model service is busy or the network is unstable. Keep completed assets and ask SceneLoop to retry failed shots instead of restarting the entire project.
+
+MiniMax H3 v5 image-animation and multi-reference video tasks wait for up to 30 minutes, including both queueing and generation. If the task is still incomplete after 30 minutes, SceneLoop stops waiting; whether the provider continues processing depends on the model service. Check the lightweight project for an existing output before retrying to avoid unnecessary duplicate generation.
 
 ## Security
 

@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | [English](README_EN.md)
 
-SceneLoop 是一套面向 AI 漫剧与 AI 短剧生产的智能工作流。用户只需向 Hermes / OpenClaw 等 AI Agent 提供剧本和创作要求，SceneLoop 即可完成剧本视觉化适配、分镜规划、角色与场景资产生成、首帧生成和逐镜视频生成。
+SceneLoop 是一套面向 AI 漫剧、AI 短剧和单图动效生产的智能工作流。用户可以向 Hermes / OpenClaw 等 AI Agent 提供剧本和创作要求，由 SceneLoop 完成剧本视觉化适配、分镜规划、角色与场景资产生成、首帧生成和逐镜视频生成；也可以只上传一张图片和动效描述，跳过剧本、角色与场景流程，直接生成图片动效视频。
 
 本项目由 **西安文鳐网络信息科技有限责任公司** 开发。
 
@@ -19,6 +19,9 @@ SceneLoop 是一套面向 AI 漫剧与 AI 短剧生产的智能工作流。用�
 - 支持动画、3D、真人短剧等不同视觉方向。
 - 根据相邻镜头关系管理人物、场景和画面连续性。
 - 支持按镜头生成、断点续作和失败镜头重试。
+- 支持“图片动效（Animate one image）”：一张上传图片加一段动作或镜头描述即可直接生成视频。
+- 支持 MiniMax H3 v5 多参考视频模型，可用于 `9:16` 和 `16:9` 图片动效及短剧镜头。
+- 图片动效会自动参考上传图片的主体、构图、色彩、光影、材质和原始风格，只执行用户明确要求的动作、局部效果或镜头运动。
 
 ## 工作流程
 
@@ -37,6 +40,18 @@ SceneLoop 是一套面向 AI 漫剧与 AI 短剧生产的智能工作流。用�
 ```
 
 Hermes 或 OpenClaw 负责与用户对话、收集参数和调用 SceneLoop。文本、图片和视频的正式生产由 SceneLoop 内部配置的模型完成，Agent 不会使用自身模型替代生产步骤。
+
+图片动效使用独立的轻量流程：
+
+```text
+上传图片 + 动效描述
+  -> 创建轻量项目并永久归档原图
+  -> 使用原图作为首帧和视觉风格基准
+  -> 直接生成一个动效视频
+  -> 保存原图、视频和生成参数
+```
+
+该流程不会创建剧本、分镜、人物角色、场景图或镜头首帧项目。
 
 ## Windows 安装要求
 
@@ -109,6 +124,19 @@ hermes skills list
 /reset
 ```
 
+### 更新已有的 Hermes 安装
+
+如果已经安装过 SceneLoop，可在 PowerShell 中执行：
+
+```powershell
+$HermesHome = if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA "hermes" }
+$SceneLoopSkill = Join-Path $HermesHome "skills\sceneloop"
+Set-Location $SceneLoopSkill
+git pull --ff-only origin main
+```
+
+更新完成后新建 Hermes 会话，或在现有会话中执行 `/reset`。
+
 ### 安装到 OpenClaw
 
 OpenClaw 可以直接从 GitHub 安装这个已经解压的 Skill：
@@ -145,6 +173,10 @@ Setup 将依次完成：
 7. 选择视频模型并输入对应 API Key。
 8. 验证配置并保存到本机。
 
+如果要使用 MiniMax H3 v5，请在视频模型列表中选择
+`minimax-h3-lightx2v-v5`，并只在本机 Setup 提示中输入对应的
+`minimax_h3_v5`。Setup 只保存和检查配置，不会为了测试凭证而提交付费视频生成任务。
+
 License Key 和 API Key 只应在本机 Setup 窗口或终端中输入，不要发送到 Hermes、OpenClaw、飞书、群聊或截图中。
 
 ### 检查授权状态
@@ -156,6 +188,8 @@ $SceneLoop = Join-Path $HermesHome "skills\sceneloop\scripts\sceneloop.exe"
 ```
 
 设备绑定信息会长期保存在本机 Memurai 中。运行租约到期后，SceneLoop 会使用已有绑定在线续签，正常情况下不需要再次输入 License Key。
+
+`sceneloop-setup.exe` 通常只在一台新电脑首次安装时运行一次。日常生成不需要重复运行。只有更换电脑、License 或 Memurai 数据丢失、`.env` 配置丢失，或者需要更换模型和 API Key 时，才需要再次运行 Setup。
 
 ## 第一次生成
 
@@ -171,10 +205,34 @@ $SceneLoop = Join-Path $HermesHome "skills\sceneloop\scripts\sceneloop.exe"
 2. 画面比例，例如 `16:9` 或 `9:16`。
 3. 画风要求；如果用户只说“短剧”，会先确认是否需要真人风格。
 4. 台词和旁白语言。
-5. 视频清晰度；更高的清晰度通常会产生更高的模型费用。
-6. 用户明确提出时，确认目标成片时长。
+5. 视频模型及该模型支持的清晰度；更高的清晰度通常会产生更高的模型费用。
+6. 采用先确认角色图和场景图的推荐流程，还是在风险提示后直接生成完整一集。
+7. 用户明确提出时，确认目标成片时长。
 
-参数确认完成后，SceneLoop 会自动执行当前项目所需的完整流程。缺少的资产会自动补齐，已经成功生成的资产不会无故重复生成。
+默认推荐先生成角色和场景参考图并交给用户确认，确认后再生成首帧和视频。缺少的资产会自动补齐，已经成功生成的资产不会无故重复生成。
+
+## 生成一张图片的动效
+
+在 Hermes 或 OpenClaw 中上传一张 JPEG、PNG 或 WebP 图片，并直接描述希望出现的动作、局部效果或镜头运动，例如：
+
+```text
+请使用 SceneLoop 的图片动效流程，让人物轻轻眨眼并微笑，头发随风轻微摆动，镜头缓慢推进，生成 5 秒视频。
+```
+
+Agent 会直接选择 **Animate one image**，不会再询问剧本、项目 ID、集数、人物角色、场景或画风。SceneLoop 会自动：
+
+1. 根据图片方向选择横屏或竖屏比例；方图在模型不支持 `1:1` 时会询问用户选择方向。
+2. 将上传图片作为唯一视觉基准和准确首帧。
+3. 保持原图中的人物身份、外观、物体造型、环境、构图、色彩、光影、材质和整体风格。
+4. 只增加用户明确要求的动作、局部效果和镜头运动，避免无关增删、变形、闪烁、身份漂移和意外风格变化。
+5. 创建一个轻量项目，永久保存原始图片、完整模型提示词、生成参数和最终视频。
+
+使用 `minimax-h3-lightx2v-v5` 时，可选分辨率为：
+
+- 竖屏：`480p竖`、`768p竖`、`1080p竖`
+- 横屏：`480p横`、`768p横`、`1080p横`
+
+支持 1–10 秒整数时长。排队与生成合计最长等待 30 分钟，状态每秒查询一次。
 
 ## 常用对话示例
 
@@ -202,6 +260,12 @@ $SceneLoop = Join-Path $HermesHome "skills\sceneloop\scripts\sceneloop.exe"
 请使用 SceneLoop 重试 city_story 第一集生成失败的镜头，不要覆盖已经成功的视频。
 ```
 
+### 生成图片动效
+
+```text
+请使用 SceneLoop 让这张图动起来：人物自然眨眼，衣服和头发有轻微风吹效果，镜头缓慢向前推进，保持原图画风。
+```
+
 ## 输出文件
 
 SceneLoop 将项目资料和视频分开保存：
@@ -222,6 +286,17 @@ output/<project_id>/
 ```
 
 `references/` 保存剧本、JSON、图片和运行报告，`output/` 只保存视频。
+
+图片动效使用独立的轻量项目目录：
+
+```text
+image_animation_projects/<project_id>/
+  source/original.<jpg|jpeg|png|webp>  归档的上传原图
+  output/animated_<request_hash>.mp4   生成的动效视频
+  project.json                         原始动效描述、完整模型提示词和生成状态
+```
+
+相同图片、提示词、模型、分辨率、时长和 Seed 的重复请求会复用已有视频；任一生成参数或提示词策略变化都会创建新的请求结果。
 
 ## 常见问题
 
@@ -303,6 +378,8 @@ $SceneLoop = Join-Path $HermesHome "skills\sceneloop\scripts\sceneloop.exe"
 ### 图片或视频生成超时
 
 模型服务繁忙或网络不稳定时可能发生超时。保留已经成功的资产，让 SceneLoop 重试失败镜头即可，无需从头生成整个项目。
+
+MiniMax H3 v5 的图片动效和多参考视频任务会等待最多 30 分钟，该时间包含排队和实际生成。超过 30 分钟仍未完成时，SceneLoop 会停止本次等待；服务端任务是否继续运行取决于模型服务。重新执行前先检查轻量项目中的现有输出，避免不必要的重复生成。
 
 ## 安全说明
 
