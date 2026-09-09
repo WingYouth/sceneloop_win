@@ -1,51 +1,118 @@
 ---
 name: sceneloop
-description: Produce or continue an AI drama, animate one uploaded image, or create a 15-second AI product ad with the packaged SceneLoop and AIAds runtimes. Use for script adaptation, storyboards, references, shot videos, episodes, image motion, or ads from product briefs, images, documents, and URLs. After secure setup, run only the matching local CLI, enforce its review gates, preserve successful assets and locked models, and resume the smallest missing scope.
+description: Produce or continue an AI drama, animate one uploaded image, or create a grounded 15-second Fast UGC product ad. Route drama and image animation through the packaged sceneloop runtime, and product advertising through the packaged ai-ads runtime. After secure shared setup, preserve review gates, successful assets, locked models, and resumable project state.
 ---
 
 # SceneLoop
 
-SceneLoop turns a script into an ordered episode of per-shot videos or animates
-one user-supplied image directly. Hermes, OpenClaw, Feishu, and other host
-Agents coordinate the user conversation, but the packaged SceneLoop runtime
-performs every production stage.
+SceneLoop is one packaged creative-production Skill with two business runtimes.
+`sceneloop` creates drama episodes or animates one image; `ai-ads` creates a
+grounded 15-second Fast UGC product ad. Hermes, OpenClaw, Feishu, and other host
+Agents coordinate the user conversation, but the packaged runtimes perform
+every production stage.
 
-## AI Ads Mode
+## Workflow Routing
 
-For product-ad requests, use only `python -m ai_ads.cli`; never generate or
-repair Ads JSON, images, or videos with the host Agent.
+Choose the runtime from user intent before collecting production settings:
 
-Before `start`, confirm the English `project_id`, product brief or supplied
-sources, market, language, aspect ratio, format (`ugc` or `product_visual`),
-and CTA. Then run the smallest resumable scope:
+1. Product advertising, UGC advertising, marketing creatives, product-selling
+   videos, or a request to turn product materials into an ad selects **AI Ads
+   Fast UGC** and the `ai-ads` runtime.
+2. One uploaded image plus an explicit request to make that image move selects
+   **Animate One Image** and the `sceneloop` runtime, even when the image shows
+   a product.
+3. A script, episode, character, location, storyboard, or drama continuation
+   request selects **Drama** and the `sceneloop` runtime.
 
-```text
-start -> add sources -> intake -> draft/review/confirm-input
-      -> product-analysis -> audience -> creative-strategy
-      -> creative-concepts -> select-concept -> script -> storyboard
-      -> plan/generate-assets -> plan/generate-video
+Do not create both project types for one request. Drama and Ads share setup,
+License, and model configuration, but never share canonical project Artifacts.
+
+## AI Ads Fast UGC
+
+The first Ads release supports one 15-second ad, five 3-second shots, one to
+five product images, `9:16` or supported `16:9`, and optional native Provider
+audio with one global Voice Profile. It supports new projects and exact Resume.
+Do not route Standard Ads, Product Visual, arbitrary durations, Variants, ad
+publishing, or full post-production through this Skill.
+
+For a new Ads project, accept product images and a short brief as the starting
+input. Commerce-page screenshots with text, prices, buttons, variant thumbnails,
+or a model wearing the product are valid sources; do not demand text-free images.
+Let runtime Vision identify the product and read the evidence.
+One screenshot by itself is sufficient. If the user supplies no brief, use
+“根据商品截图制作真实自然的15秒UGC广告” internally; do not ask them to transcribe
+the product title, price, specifications, or visible page content.
+
+Reuse user preferences and configured default model aliases. For missing settings,
+propose one compact default package: 9:16, the conversation language, its market
+when clear, a neutral "learn more" CTA, natural everyday product demonstration,
+and native speech with a natural adult Voice Profile if the configured model
+supports it (otherwise no audio). Use CLI-supported Voice Profile values.
+State defaults together in Request review; do not ask separate questions for each
+parameter or offer model menus unless configuration is missing or the user asks.
+Ask only for information that materially changes product selection or campaign.
+Create
+an internal lowercase ASCII project ID such as `ad_YYYYMMDD_HHMMSS`; do not ask
+the user to invent one. Use `AI_ADS_WORKSPACE` when set, otherwise use
+`${HERMES_SKILL_DIR}/workspace/ads`.
+
+For exactly one Product screenshot, default to one-confirmation full-auto mode.
+Treat an explicit instruction such as “直接生成”, “开始制作”, or “自动执行” as
+that authorization. Otherwise ask one compact question before production that
+states the defaults and the complete scope: one Vision call, one Text planning
+call with at most one semantic repair only if its output is invalid, five Image
+tasks, five paid Video tasks, and one 15-second Preview. Include aspect ratio and
+audio mode in that same question. Never ask another approval question after the
+user authorizes this unchanged scope.
+
+After authorization, create with `ai-ads start --workflow-mode fast_ugc`, register
+the screenshot with `add-image`, then run `auto-run --confirm-full-run` with the
+configured Vision, Text, Image, and Video aliases. `auto-run` owns Evidence
+selection, conflict exclusion, Request confirmation, Creative policy approval,
+Frame approval, paid Video submission, task resume, and Preview assembly. Do not
+replace it with `advance`, `confirm-fast-request`, `approve-fast-plan`,
+`approve-assets`, or `generate-video`, and do not expose those internal gates as
+questions to the user.
+
+Use this command shape after `start` and `add-image`:
+
+```bash
+ai-ads auto-run --workspace-dir WORKSPACE --project-id PROJECT_ID \
+  --confirm-full-run --vision-model VISION --text-model TEXT \
+  --image-model IMAGE --video-model VIDEO --audio-mode muted
 ```
 
-Do not cross these checkpoints without explicit user approval:
+Use `--audio-mode native` plus the CLI Voice Profile options only when native
+audio was included in the initial authorization.
 
-1. `confirm-input`;
-2. `approve-product-profile` when the project is waiting for review;
-3. `select-concept`;
-4. generated-asset review before video work, and video-plan review before paid
-   generation.
+The full-auto policy uses the sole screenshot as the authoritative Product
+source, includes only directly observed Facts with `advertisingUse=allowed`, and
+keeps claims, prices, sales counts, service promises, unresolved conflicts, and
+unknowns out of advertising copy. It stops with a structured error if product
+identity is ambiguous or deterministic Creative safety checks fail; report that
+failure without asking the user to classify internal Sources, Facts, Frames, or
+JSON.
 
-Use `status` to inspect real artifacts and `resume` or a targeted command to
-continue only missing work. Keep selected models and completed assets; obtain
-approval before changing a model or regenerating an asset. Never expose
-credentials or provider payloads.
+If `auto-run` returns `complete=false` or `action=resume_required`, rerun the same
+command automatically for the same project and options. Successful artifacts and
+Provider task IDs are resumable and must not be regenerated. When it returns
+`complete=true`, present the Preview from `agentState.media` and stop. Do not ask
+for a final Preview confirmation unless the user requested iterative review.
+
+`agent-state` now returns `contractVersion=ai_ads.agent.v3`,
+`supportsAutonomousRun=true`, and `autonomousCommand=auto-run`. It remains the
+read-only diagnostic contract. `projectStatus` and disk filenames are not gates;
+a JSON file is authoritative only when registered by the manifest. Never compare
+or repair disk hashes, hand-edit Ads JSON, substitute host models, or ask the user
+to remove commerce-page text merely to bypass validation.
 
 ## Non-Negotiable Rules
 
-1. Use SceneLoop for script adaptation, storyboard planning, character images,
-   location images, first frames, videos, direct uploaded-image animation,
-   episode rendering, and continuation of existing work.
-2. Never replace a SceneLoop text, image, video, or multimodal model call with
-   the host Agent's own model capabilities.
+1. Use the packaged runtimes for Ads, script adaptation, storyboard planning,
+   character images, location images, first frames, videos, direct uploaded-
+   image animation, episode rendering, and continuation of existing work.
+2. Never replace a SceneLoop or AIAds text, image, video, or multimodal model
+   call with the host Agent's own model capabilities.
 3. Never fabricate or manually repair canonical JSON, generated images, model
    responses, continuity frames, or videos.
 4. Never bypass, patch, or weaken the SceneLoop license gate.
@@ -60,7 +127,7 @@ explain failures, present files, and maintain compact continuation memory.
 
 ## Runtime Resolution
 
-At every activation, resolve two commands without hardcoding an absolute user
+At every activation, resolve three commands without hardcoding an absolute user
 path.
 
 Resolve the SceneLoop runtime in this order:
@@ -70,48 +137,67 @@ Resolve the SceneLoop runtime in this order:
 3. `${HERMES_SKILL_DIR}/scripts/sceneloop` on macOS/Linux or
    `${HERMES_SKILL_DIR}/scripts/sceneloop.exe` on Windows.
 
+Resolve the AI Ads runtime in this order:
+
+1. executable path from `AI_ADS_EXECUTABLE`;
+2. `ai-ads` or `ai-ads.exe` available through `PATH`;
+3. `${HERMES_SKILL_DIR}/scripts/ai-ads` on macOS/Linux or
+   `${HERMES_SKILL_DIR}/scripts/ai-ads.exe` on Windows.
+
 Resolve setup in this order:
 
 1. executable path from `SCENELOOP_SETUP_EXECUTABLE`;
-2. `sceneloop-setup` or `sceneloop-setup.exe` available through `PATH`;
-3. `${HERMES_SKILL_DIR}/scripts/sceneloop-setup` on macOS/Linux or
-   `${HERMES_SKILL_DIR}/scripts/sceneloop-setup.exe` on Windows.
+2. `${HERMES_SKILL_DIR}/scripts/setup` on macOS/Linux or
+   `${HERMES_SKILL_DIR}/scripts/setup.exe` on Windows.
+
+Do not resolve a bare `setup` command through `PATH`; the name is intentionally
+generic and must remain scoped to this installed Skill.
 
 Hermes replaces `${HERMES_SKILL_DIR}` with the installed Skill directory.
 Other hosts must resolve the directory containing their loaded `SKILL.md`.
 Do not assume a home, download, repository, or operating-system-specific
 absolute path.
 
-Use the resolved runtime path for every command shown below as `sceneloop`.
+Use the resolved runtime paths for every command shown below as `sceneloop`,
+`ai-ads`, and `setup`.
 
 ## Automatic Setup
 
-Credential readiness is a blocking gate and must run before collecting
-`project_id`, episode number, or any creative settings.
+Credential readiness is a blocking gate and must run before collecting project
+identifiers, episode numbers, or creative settings.
 
-1. Run `sceneloop --help`.
-2. Run `sceneloop license status`.
-3. If the runtime is missing, the License reports `LICENSE_NOT_ACTIVATED`, or
-   provider configuration is incomplete, tell the user that local SceneLoop
-   authorization and model-provider setup must be completed before production.
-4. Execute the resolved `sceneloop-setup` automatically in a user-visible,
+The current SceneLoop License authority is `http://114.66.54.147:8000` and its
+health endpoint is `http://114.66.54.147:8000/sceneloop/health`. Treat any
+persisted error or Agent Memory that mentions `http://211.101.234.146:8000` as
+historical state from an obsolete release, not as the active endpoint. Never
+infer the current License authority from an old project's saved stage error;
+use the resolved packaged runtime and its readiness/status result.
+
+1. Run `sceneloop --help` for Drama/Image work or `ai-ads --help` for Ads.
+2. For Drama/Image, run `sceneloop license status`. For Ads, run
+   `ai-ads readiness`.
+3. If a required runtime is missing, License reports
+   `LICENSE_NOT_ACTIVATED`, Ads reports `ready=false`, or Provider configuration
+   is incomplete, tell the user that local authorization and model setup must
+   be completed before production.
+4. Execute the resolved `setup` automatically in a user-visible,
    interactive local session. Run the executable directly in the foreground;
    do not wrap it with shell-specific keep-open commands such as `read -p`.
    Do not ask the user to locate or launch it.
 5. Tell the user to enter the License Key and the API Keys requested for the
-   selected text, image, and video providers only inside the local setup
+   selected Vision, Text, Image, and Video Providers only inside the local setup
    prompt. Never ask the user to paste a secret into chat, Feishu, Hermes,
    OpenClaw, command arguments, or Agent Memory.
    If the user has already requested `minimax-h3-lightx2v-v5`, tell them to
    select that exact video-model alias in setup and enter the requested
    `minimax_h3_v5` only in the local setup prompt.
-6. Wait for setup to finish. It selects the three default model aliases, saves
+6. Wait for setup to finish. It selects the four default model aliases, saves
    the required provider credentials locally, and runs each configured
    provider's non-generating connection test when one is available. MiniMax H3
    v5 setup stores the token but does not submit a paid generation task as a
    credential test.
-7. After setup, resolve the runtime again and run
-   `sceneloop license status`.
+7. After setup, resolve the runtimes again. Run `sceneloop license status` and,
+   for Ads, `ai-ads readiness`.
 8. Continue to project questions only when the License is valid and setup has
    completed. If setup fails or the secure local prompt is unavailable, stop
    and report the setup failure; do not begin planning and do not substitute
@@ -122,17 +208,18 @@ an installation failure: SceneLoop automatically verifies its persisted device
 binding and refreshes the lease. Request License activation only when the
 runtime reports `LICENSE_NOT_ACTIVATED`.
 
-When a later SceneLoop command reports a missing provider environment key,
-treat it as incomplete setup: launch `sceneloop-setup` again and configure the
+When a later runtime command reports a missing Provider environment key,
+treat it as incomplete setup: launch `setup` again and configure the
 credential locally. Do not ask for the key in chat.
 
-If neither the runtime nor bundled setup can be resolved, report that the
+If a required runtime or bundled setup cannot be resolved, report that the
 SceneLoop Skill package is incomplete. Never substitute host-Agent generation.
 
 ## Workflow Selection
 
-After setup succeeds, run `sceneloop workflows` and identify the requested
-workflow before asking for project inputs. If the user's intent already
+For Drama or Animate One Image, after setup succeeds run `sceneloop workflows`
+and identify the requested workflow before asking for project inputs. Ads uses
+the AI Ads section above and must not run `sceneloop workflows`. If intent already
 selects one workflow, use it without asking them to reconfirm. If the request
 is ambiguous, present the returned SceneLoop workflows and wait for one
 selection. The current workflows are:

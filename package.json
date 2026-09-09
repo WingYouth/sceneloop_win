@@ -1,0 +1,55 @@
+{
+  "name": "sceneloop-win",
+  "version": "1.0.0",
+  "description": "Install the prebuilt SceneLoop Skill for Windows x64 into Hermes, OpenClaw, Claude Code, or Codex.",
+  "license": "UNLICENSED",
+  "author": "Xi'an Wenyao Network Information Technology Co., Ltd.",
+  "homepage": "https://www.wenyaotech.com/products?category=autodrama&product=sceneloop",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WingYouth/sceneloop_win.git"
+  },
+  "bugs": {
+    "url": "https://github.com/WingYouth/sceneloop_win/issues"
+  },
+  "bin": {
+    "sceneloop-win": "bin/sceneloop-win.cjs"
+  },
+  "files": [
+    "bin/sceneloop-win.cjs",
+    "scripts/sceneloop.exe",
+    "scripts/sceneloop-setup.exe",
+    "SKILL.md",
+    "README.md",
+    "README_EN.md"
+  ],
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "engines": {
+    "node": ">=18",
+    "npm": ">=9"
+  },
+  "scripts": {
+    "test": "node --check bin/sceneloop-win.cjs && node test/npm-installer-smoke.cjs",
+    "pack:check": "npm pack --dry-run --cache .npm-cache",
+    "prepublishOnly": "npm test"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "keywords": [
+    "agent-skill",
+    "ai-video",
+    "claude-code",
+    "codex",
+    "hermes-agent",
+    "openclaw",
+    "sceneloop",
+    "windows"
+  ]
+}

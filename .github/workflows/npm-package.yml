@@ -1,0 +1,34 @@
+name: npm package check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  windows-package:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Test npm installer
+        run: npm test
+
+      - name: Check npm package contents
+        run: npm run pack:check
+
+      - name: Verify Windows executable
+        shell: pwsh
+        timeout-minutes: 2
+        run: |
+          Get-Item .\scripts\sceneloop.exe
+          Get-FileHash .\scripts\sceneloop.exe -Algorithm SHA256
+          & .\scripts\sceneloop.exe --help

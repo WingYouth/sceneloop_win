@@ -2,13 +2,28 @@
 
 [简体中文](README.md) | [English](README_EN.md)
 
-SceneLoop is an intelligent workflow for producing AI comics, AI short dramas, and single-image animation. Give a script and creative requirements to an AI agent such as Hermes or OpenClaw, and SceneLoop handles visual adaptation, storyboard planning, character and location assets, first frames, and shot-by-shot video generation. You can also upload one image with a motion description to generate an animated video directly, without the script, character, or location workflow.
+SceneLoop is a packaged binary workflow for producing AI comics, AI short dramas, single-image animation, and AI product ads. Submit scripts, images, product materials, and creative requirements through an AI agent such as Hermes, OpenClaw, Claude Code, or Codex; the native programs in this distribution perform the actual text, image, and video production.
 
 SceneLoop is developed by **Xi'an Wenyao Network Information Technology Co., Ltd.**
 
 [Visit the SceneLoop product website](https://www.wenyaotech.com/products?category=autodrama&product=sceneloop)
 
 > This guide covers the Windows edition of the SceneLoop Skill.
+
+## Package Contents
+
+```text
+sceneloop_win/
+├── README.md
+├── README_EN.md
+├── SKILL.md
+└── scripts/
+    ├── sceneloop.exe   drama and single-image animation
+    ├── ai-ads.exe      AI product advertising
+    └── setup.exe       licensing and model configuration
+```
+
+All three programs are prebuilt Windows x64 (AMD64) binaries. Users do not need Python, a compiler, or the project source code, and should not move an individual executable out of this Skill directory.
 
 ## Features
 
@@ -22,6 +37,8 @@ SceneLoop is developed by **Xi'an Wenyao Network Information Technology Co., Ltd
 - Supports **Animate one image**: one uploaded image and a motion or camera description produce a video directly.
 - Supports the MiniMax H3 v5 multi-reference video model for `9:16` and `16:9` image animations and drama shots.
 - Automatically preserves the uploaded image's subjects, composition, colors, lighting, materials, and original visual style while applying only the motion, local effects, or camera movement explicitly requested by the user.
+- Creates one 15-second Fast UGC product ad from one to five product images or commerce-page screenshots.
+- Runs AI Ads through the separate `ai-ads.exe` binary while preserving authorization, factual constraints, resumable state, and successful assets.
 
 ## Workflow
 
@@ -39,7 +56,7 @@ Upload script
   -> Output videos
 ```
 
-Hermes or OpenClaw handles the user conversation, collects parameters, and invokes SceneLoop. SceneLoop's configured models perform the actual text, image, and video production; the agent must not substitute its own models for these production steps.
+The host agent handles the user conversation, collects parameters, and invokes SceneLoop. SceneLoop's configured models perform the actual text, image, and video production; the agent must not substitute its own models for these production steps.
 
 Image animation uses a separate lightweight workflow:
 
@@ -53,6 +70,18 @@ Uploaded image + motion description
 
 This workflow does not create a script, storyboard, characters, locations, or a separate shot first-frame project.
 
+AI product ads use a separate workflow:
+
+```text
+Product images or commerce screenshot + short brief
+  -> Identify grounded product facts and plan the creative
+  -> Generate five image assets
+  -> Generate five three-second video clips
+  -> Assemble one 15-second Fast UGC preview
+```
+
+Drama, image animation, and AI Ads share local licensing and model configuration, but their project data remains separate.
+
 ## Windows Requirements
 
 Before you begin, prepare:
@@ -60,11 +89,13 @@ Before you begin, prepare:
 - 64-bit Windows 10 or Windows 11.
 - A prebuilt SceneLoop Windows directory matching your computer architecture. This repository provides the AMD64 version.
 - Git installed and available from PowerShell.
-- A working Hermes Desktop, Hermes CLI, or OpenClaw installation.
+- A working Hermes, OpenClaw, Claude Code, or Codex installation; only one is required.
+- Node.js 18 or later and npm 9 or later when using the npm installer.
 - A SceneLoop License Key.
 - API keys required by your selected text, image, and video models.
 - Network access to the model services and SceneLoop License Server.
 - Administrator access for the initial Memurai installation and configuration.
+- `ffmpeg.exe` and `ffprobe.exe` available in `PATH` when assembling AI Ads videos.
 
 Users of this prebuilt distribution do not need to install Python.
 
@@ -95,11 +126,59 @@ If you use OpenClaw, follow the [OpenClaw getting-started guide](https://docs.op
 openclaw --version
 ```
 
-You may use either Hermes or OpenClaw; installing both is not required.
+You may use Hermes, OpenClaw, Claude Code, or Codex; installing more than one is not required.
 
 ## Install the SceneLoop Skill
 
-### Install in Hermes
+SceneLoop supports both GitHub and npm distribution. GitHub users can continue cloning this repository, while end users can use the interactive npm installer.
+
+### Install with npm (Recommended)
+
+The npm package contains the complete Windows x64 SceneLoop Skill and three prebuilt executables. The installer detects Hermes, OpenClaw, Claude Code, and Codex, then asks where to install SceneLoop. You may select one, several, or all detected agents.
+
+Open PowerShell outside the `sceneloop_win` source directory and run:
+
+```powershell
+Set-Location $HOME
+npx --yes --registry=https://registry.npmjs.org/ sceneloop-win
+```
+
+Specify one or more targets when needed:
+
+```powershell
+npx --yes --registry=https://registry.npmjs.org/ sceneloop-win --agent hermes
+npx --yes --registry=https://registry.npmjs.org/ sceneloop-win --agent claude,codex
+npx --yes --registry=https://registry.npmjs.org/ sceneloop-win --all --yes
+```
+
+Inspect detection or preview changes without writing files:
+
+```powershell
+npx --yes --registry=https://registry.npmjs.org/ sceneloop-win --list
+npx --yes --registry=https://registry.npmjs.org/ sceneloop-win --all --dry-run
+```
+
+For a persistent global command:
+
+```powershell
+npm install -g sceneloop-win --registry=https://registry.npmjs.org/
+sceneloop-win
+```
+
+The `npm i sceneloop-win` command shown by the npm website is the generic project-dependency command. End users should normally use the `npx` command above.
+
+| Agent | Default SceneLoop Skill directory |
+|---|---|
+| Hermes | `%LOCALAPPDATA%\hermes\skills\sceneloop`, or the configured `HERMES_HOME` |
+| OpenClaw | `%USERPROFILE%\.openclaw\skills\sceneloop` |
+| Claude Code | `%USERPROFILE%\.claude\skills\sceneloop` |
+| Codex | `%USERPROFILE%\.agents\skills\sceneloop` |
+
+When updating an existing installation, the installer replaces only `SKILL.md`, the READMEs, and the three `.exe` files. It preserves `scripts\.env` and user project data. Previous files are backed up under `%LOCALAPPDATA%\SceneLoopInstaller\backups\`. If Windows reports that a file is in use, close SceneLoop and the corresponding agent before retrying.
+
+> `sceneloop-win` is restricted to Windows x64. npm or the installer rejects Windows ARM64, macOS, and Linux because this repository's binaries are not compatible with those platforms.
+
+### Install in Hermes from GitHub
 
 This GitHub repository already contains the extracted Skill directory. Run in PowerShell:
 
@@ -124,7 +203,7 @@ After installation, start a new Hermes conversation or run:
 /reset
 ```
 
-### Update an Existing Hermes Installation
+### Update an Existing GitHub Installation
 
 If SceneLoop is already installed, run in PowerShell:
 
@@ -137,7 +216,7 @@ git pull --ff-only origin main
 
 After updating, start a new Hermes conversation or run `/reset` in the current conversation.
 
-### Install in OpenClaw
+### Install with the OpenClaw CLI
 
 OpenClaw can install this extracted Skill directly from GitHub:
 
@@ -148,19 +227,47 @@ openclaw skills list
 
 OpenClaw installs a global Skill in its managed Skill directory. Start a new OpenClaw conversation after installation so it loads the updated Skill list. See the [official OpenClaw Skills documentation](https://docs.openclaw.ai/tools/skills) for current commands and directory rules.
 
+## Publish to npm (Maintainers)
+
+Validate the installer and package file list before publishing:
+
+```powershell
+npm test
+npm run pack:check
+```
+
+For the first release:
+
+```powershell
+npm login --registry=https://registry.npmjs.org/
+npm whoami --registry=https://registry.npmjs.org/
+npm publish --cache .npm-cache
+```
+
+For later releases, increment the version before publishing:
+
+```powershell
+npm version patch
+npm publish --cache .npm-cache
+```
+
+npm publishing requires account 2FA or a Granular Access Token that can bypass 2FA. The `files` allowlist in `package.json` publishes only `SKILL.md`, both READMEs, the installer, and the three prebuilt executables. It excludes `.git`, local configuration, and unrelated working files. Always inspect `npm run pack:check` and confirm that no License Key, API key, or `.env` is included.
+
+npm publishing does not interfere with GitHub. You can still commit, tag, and push this repository normally, and the GitHub clone-based installation remains available.
+
 ## First-Time Setup and Licensing
 
-When you upload a script and request generation in Hermes or OpenClaw, SceneLoop first checks the runtime, Memurai, license, and model configuration. If setup is incomplete, the agent launches `sceneloop-setup.exe`.
+When you request generation in a host agent, SceneLoop first checks the runtime, Memurai, license, and model configuration. If setup is incomplete, the agent launches `setup.exe`.
 
 Initial Windows setup may need to install and start the Memurai service. Right-click PowerShell or Windows Terminal, select **Run as administrator**, and run Setup once:
 
 ```powershell
 $HermesHome = if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA "hermes" }
-$Setup = Join-Path $HermesHome "skills\sceneloop\scripts\sceneloop-setup.exe"
+$Setup = Join-Path $HermesHome "skills\sceneloop\scripts\setup.exe"
 & $Setup
 ```
 
-If you installed the Skill through OpenClaw, run `sceneloop-setup.exe` from the corresponding `sceneloop\scripts\` path in OpenClaw's managed Skill directory.
+If you installed the Skill through another agent, run `setup.exe` from that agent's managed `sceneloop\scripts\` directory.
 
 Setup performs these steps:
 
@@ -168,10 +275,9 @@ Setup performs these steps:
 2. Checks for a Redis-compatible service and installs Memurai through WinGet if required.
 3. Configures Memurai as an automatically started Windows service and verifies the connection.
 4. Activates the device with your SceneLoop License Key.
-5. Lets you select a text model and enter its API key.
-6. Lets you select an image model and enter its API key.
-7. Lets you select a video model and enter its API key.
-8. Verifies and saves the configuration locally.
+5. Lets you select Vision, Text, Image, and Video models.
+6. Collects their API keys through the local interactive interface.
+7. Verifies and saves the configuration locally.
 
 To use MiniMax H3 v5, select `minimax-h3-lightx2v-v5` from the video-model list and enter its `minimax_h3_v5` only in the local Setup prompt. Setup saves and checks the configuration but does not submit a paid video-generation task just to test this credential.
 
@@ -187,7 +293,7 @@ $SceneLoop = Join-Path $HermesHome "skills\sceneloop\scripts\sceneloop.exe"
 
 Device binding data remains in local Memurai. When a runtime lease expires, SceneLoop renews it online using the existing binding, so you normally do not need to enter the License Key again.
 
-You normally run `sceneloop-setup.exe` only once when installing SceneLoop on a new computer. Daily generation does not require Setup again. Rerun it only after moving to another computer, losing the License or Memurai data, losing the `.env` configuration, or when changing models or API keys.
+You normally run `setup.exe` only once when installing SceneLoop on a new computer. Daily generation does not require Setup again. Rerun it only after moving to another computer, losing the License or Memurai data, losing the `.env` configuration, or when changing models or API keys.
 
 ## First Generation
 
@@ -232,6 +338,29 @@ For `minimax-h3-lightx2v-v5`, the available resolutions are:
 
 It supports whole-second durations from 1 through 10 seconds. Queueing and generation may wait for up to 30 minutes in total, with status polled once per second.
 
+## Create an AI Product Ad
+
+Upload one to five product images or commerce-page screenshots through the host agent and ask for a product ad. For example:
+
+```text
+Use SceneLoop to create a natural 15-second vertical UGC ad from this product screenshot. Generate it directly.
+```
+
+The current Fast UGC workflow produces five three-second shots and assembles one 15-second preview. It supports `9:16` and model-supported `16:9`. One clear product screenshot is sufficient; users do not need to transcribe the visible product name, price, or specifications.
+
+When the user authorizes direct generation, the agent states and confirms the complete cost scope once. The `ai-ads.exe` runtime then performs product understanding, planning, image generation, video generation, and assembly. If execution is interrupted, resume the same project; successful assets and provider tasks are not submitted again.
+
+Check AI Ads readiness in PowerShell:
+
+```powershell
+$HermesHome = if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA "hermes" }
+$AIAds = Join-Path $HermesHome "skills\sceneloop\scripts\ai-ads.exe"
+& $AIAds readiness
+& $AIAds models
+```
+
+For another host agent, use `scripts\ai-ads.exe` under its managed Skill directory. The current release is not intended for arbitrary ad durations, bulk variants, automatic publishing, or complete post-production.
+
 ## Example Requests
 
 ### Vertical AI Comic Drama
@@ -262,6 +391,12 @@ Use SceneLoop to retry the failed shots in episode 1 of city_story without overw
 
 ```text
 Use SceneLoop to animate this image: make the person blink naturally, add a light breeze to the clothes and hair, and slowly push the camera forward while preserving the original visual style.
+```
+
+### Create a 15-Second Product Ad
+
+```text
+Use SceneLoop to turn these product images into a natural 15-second 9:16 UGC ad with native English speech. Run it directly.
 ```
 
 ## Output Files
@@ -296,6 +431,16 @@ image_animation_projects/<project_id>/
 
 Repeated requests with the same image, prompt, model, resolution, duration, and seed reuse the existing video. A change to any generation setting or prompt-policy version creates a new request result.
 
+AI Ads projects are stored in the Skill's ads workspace by default:
+
+```text
+workspace/ads/ads_projects/<project_id>/
+  manifest.json                    project manifest and resumable state
+  ...                              evidence, plans, images, videos, and final preview
+```
+
+Do not delete the project directory after an interrupted run. Resume the same project to reuse completed results.
+
 ## Troubleshooting
 
 ### PowerShell Cannot Run the Program or Find a File
@@ -306,10 +451,11 @@ Recalculate the installation path and check the files:
 $HermesHome = if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA "hermes" }
 $SceneLoopSkill = Join-Path $HermesHome "skills\sceneloop"
 Test-Path "$SceneLoopSkill\scripts\sceneloop.exe"
-Test-Path "$SceneLoopSkill\scripts\sceneloop-setup.exe"
+Test-Path "$SceneLoopSkill\scripts\ai-ads.exe"
+Test-Path "$SceneLoopSkill\scripts\setup.exe"
 ```
 
-Both commands should return `True`.
+All three commands should return `True`.
 
 ### Windows SmartScreen Blocks the Executable
 
@@ -328,7 +474,7 @@ Get-Service Memurai
 Test-NetConnection 127.0.0.1 -Port 6379
 ```
 
-`Get-Service` should report `Running`, and `TcpTestSucceeded` should be `True`. If Memurai is not installed, run `sceneloop-setup.exe` again.
+`Get-Service` should report `Running`, and `TcpTestSucceeded` should be `True`. If Memurai is not installed, run `setup.exe` again.
 
 ### Hermes Does Not Invoke SceneLoop
 
@@ -356,7 +502,7 @@ $SceneLoop = Join-Path $HermesHome "skills\sceneloop\scripts\sceneloop.exe"
 & $SceneLoop license verify
 ```
 
-If the device has never been activated, run `sceneloop-setup.exe` again from an administrator PowerShell. Do not bypass or modify license validation.
+If the device has never been activated, run `setup.exe` again from an administrator PowerShell. Do not bypass or modify license validation.
 
 ### License Key Is Requested on Every Run
 
@@ -371,7 +517,7 @@ This should not happen under normal conditions. Check that:
 
 - `401` usually indicates an invalid or expired API key, or a key configured for the wrong provider.
 - `403` usually indicates account permissions, insufficient balance, or a service that has not been enabled.
-- After changing model configuration, run `sceneloop-setup.exe` again to verify it.
+- After changing model configuration, run `setup.exe` again to verify it.
 
 ### Image or Video Generation Times Out
 
